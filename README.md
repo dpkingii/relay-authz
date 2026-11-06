@@ -12,7 +12,7 @@ document:budget#viewer@group:finance#member    every member of finance can view 
 ## Status
 
 - [x] Tuples table, write/delete API
-- [ ] Direct checks (week 1)
+- [x] Direct checks
 - [ ] Recursive checks through groups and parent folders, config-defined relation rules (week 2)
 - [ ] Revision numbers and a Redis cache keyed by revision (week 3)
 - [ ] Docker deploy to EC2, k6 load test (week 4)

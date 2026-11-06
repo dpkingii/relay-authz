@@ -3,7 +3,6 @@ package check
 
 import (
 	"context"
-	"errors"
 
 	"github.com/dpkingii/relay-authz/internal/tuple"
 )
@@ -19,6 +18,15 @@ type Reader interface {
 // Week 1: direct tuples only. A tuple whose subject is a userset
 // (group:finance#member) does not grant anything yet; following it is week 2.
 func Check(ctx context.Context, r Reader, object tuple.Object, relation string, user tuple.Object) (bool, error) {
-	// TODO: implement, then `go test ./internal/check` should pass.
-	return false, errors.New("check: not implemented")
+	subjects, err := r.ReadSubjects(ctx, object, relation)
+	if err != nil {
+		return false, err
+	}
+	want := tuple.Subject{Type: user.Type, ID: user.ID}
+	for _, s := range subjects {
+		if s == want {
+			return true, nil
+		}
+	}
+	return false, nil
 }
