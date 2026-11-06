@@ -3,18 +3,22 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/dpkingii/relay-authz/internal/check"
+	"github.com/dpkingii/relay-authz/internal/rules"
 	"github.com/dpkingii/relay-authz/internal/store"
 	"github.com/dpkingii/relay-authz/internal/tuple"
 )
 
-func New(s *store.Store) http.Handler {
+func New(s *store.Store, rs rules.Rules) http.Handler {
+	checker := check.Checker{Reader: s, Rules: rs}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/tuples", func(w http.ResponseWriter, r *http.Request) {
-		t, ok := readTuple(w, r)
+		t, ok := readTuple(w, r, rs)
 		if !ok {
 			return
 		}
@@ -25,7 +29,7 @@ func New(s *store.Store) http.Handler {
 		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("DELETE /v1/tuples", func(w http.ResponseWriter, r *http.Request) {
-		t, ok := readTuple(w, r)
+		t, ok := readTuple(w, r, rs)
 		if !ok {
 			return
 		}
@@ -47,7 +51,20 @@ func New(s *store.Store) http.Handler {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		allowed, err := check.Check(r.Context(), s, object, q.Get("relation"), user)
+		relation := q.Get("relation")
+		if !rs.HasRelation(object.Type, relation) {
+			http.Error(w, fmt.Sprintf("unknown relation %s#%s", object.Type, relation), http.StatusBadRequest)
+			return
+		}
+		if !rs.HasType(user.Type) {
+			http.Error(w, fmt.Sprintf("unknown type %s", user.Type), http.StatusBadRequest)
+			return
+		}
+		allowed, err := checker.Check(r.Context(), object, relation, user)
+		if errors.Is(err, check.ErrTooDeep) {
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		}
 		if err != nil {
 			internalError(w, err)
 			return
@@ -58,8 +75,9 @@ func New(s *store.Store) http.Handler {
 	return mux
 }
 
-// readTuple decodes a {"tuple": "type:id#relation@type:id"} body, answering 400 if it's malformed.
-func readTuple(w http.ResponseWriter, r *http.Request) (tuple.Tuple, bool) {
+// readTuple decodes a {"tuple": "type:id#relation@type:id"} body, answering 400 if it's
+// malformed or names a type or relation the rules don't define.
+func readTuple(w http.ResponseWriter, r *http.Request, rs rules.Rules) (tuple.Tuple, bool) {
 	var body struct {
 		Tuple string `json:"tuple"`
 	}
@@ -68,6 +86,9 @@ func readTuple(w http.ResponseWriter, r *http.Request) (tuple.Tuple, bool) {
 		return tuple.Tuple{}, false
 	}
 	t, err := tuple.Parse(body.Tuple)
+	if err == nil {
+		err = rs.Validate(t)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return tuple.Tuple{}, false

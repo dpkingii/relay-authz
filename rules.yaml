@@ -1,0 +1,32 @@
+# Each type lists its relations. Besides its own tuples (direct, or through a
+# userset like group:finance#member), a relation is granted by:
+#   implied_by: other relations on the same object that include it
+#   via:        a relation on related objects, found through a tupleset like parent
+user: {}
+
+group:
+  member:
+
+folder:
+  parent:
+  owner:
+  editor:
+    implied_by: [owner]
+    via:
+      - {tupleset: parent, relation: editor}
+  viewer:
+    implied_by: [editor]
+    via:
+      - {tupleset: parent, relation: viewer}
+
+document:
+  parent:
+  owner:
+  editor:
+    implied_by: [owner]
+    via:
+      - {tupleset: parent, relation: editor}
+  viewer:
+    implied_by: [editor]
+    via:
+      - {tupleset: parent, relation: viewer}

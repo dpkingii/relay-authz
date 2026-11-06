@@ -2,7 +2,10 @@ module github.com/dpkingii/relay-authz
 
 go 1.27.3
 
-require github.com/jackc/pgx/v5 v5.12.0
+require (
+	github.com/jackc/pgx/v5 v5.12.0
+	go.yaml.in/yaml/v3 v3.0.6
+)
 
 require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
