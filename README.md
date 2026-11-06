@@ -30,8 +30,8 @@ Writes and deletes are idempotent.
 ## Develop
 
 ```
-docker compose up -d                 # Postgres on localhost:5433, schema applied on first start
-export DATABASE_URL=postgres://authz:authz@localhost:5433/authz
+docker compose up -d                 # Postgres on localhost:5434, schema applied on first start
+export DATABASE_URL=postgres://authz:authz@localhost:5434/authz
 
 go test ./...
 go run ./cmd/server                  # http://localhost:8080

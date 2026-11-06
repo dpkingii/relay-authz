@@ -5,9 +5,9 @@ services:
       POSTGRES_USER: authz
       POSTGRES_PASSWORD: authz
       POSTGRES_DB: authz
-    # 5433 so it doesn't collide with a Postgres already running on the host.
+    # 5434 so it doesn't collide with a Postgres already running on the host.
     ports:
-      - "5433:5432"
+      - "5434:5432"
     volumes:
       - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
       - pgdata:/var/lib/postgresql/data
