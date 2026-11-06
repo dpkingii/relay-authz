@@ -1,0 +1,8 @@
+{"mode":"uncached","rate":6000,"write_ratio":0,"at_least":false,"checks":359432,"hit_rate":0,"p50":3.05,"p95":5.51,"p99":13.65,"dropped":570,"failed":0}
+{"mode":"cached","rate":6000,"write_ratio":0,"at_least":false,"checks":359791,"hit_rate":0.42,"p50":1.83,"p95":3.93,"p99":5.45,"dropped":212,"failed":0}
+{"mode":"cached-at-least","rate":6000,"write_ratio":0,"at_least":true,"checks":358406,"hit_rate":0.42,"p50":1.92,"p95":5.04,"p99":35.19,"dropped":1596,"failed":0}
+{"mode":"cached-writes","rate":6000,"write_ratio":0.01,"at_least":false,"checks":355646,"hit_rate":0.01,"p50":3.23,"p95":5.14,"p99":10.99,"dropped":727,"failed":0}
+{"mode":"uncached","rate":8000,"write_ratio":0,"at_least":false,"checks":472058,"hit_rate":0,"p50":4.73,"p95":66,"p99":95.33,"dropped":7944,"failed":0}
+{"mode":"cached","rate":8000,"write_ratio":0,"at_least":false,"checks":478352,"hit_rate":0.46,"p50":1.83,"p95":4.65,"p99":12.57,"dropped":1644,"failed":0}
+{"mode":"cached-at-least","rate":8000,"write_ratio":0,"at_least":true,"checks":475693,"hit_rate":0.46,"p50":1.89,"p95":6.79,"p99":52.34,"dropped":4306,"failed":0}
+{"mode":"cached-writes","rate":8000,"write_ratio":0.01,"at_least":false,"checks":464311,"hit_rate":0.01,"p50":9.48,"p95":80.31,"p99":101.08,"dropped":11124,"failed":0}

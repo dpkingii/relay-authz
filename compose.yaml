@@ -7,7 +7,7 @@ services:
       POSTGRES_DB: authz
     # 5434 and 6380 so they don't collide with other Postgres and Redis instances on the host.
     ports:
-      - "5434:5432"
+      - "127.0.0.1:5434:5432"
     volumes:
       - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
       - pgdata:/var/lib/postgresql/data
@@ -17,11 +17,41 @@ services:
 
   redis:
     image: redis:7
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     ports:
-      - "6380:6379"
+      - "127.0.0.1:6380:6379"
     healthcheck:
       test: redis-cli ping
       interval: 2s
+
+  # The whole stack in Docker: docker compose --profile server up -d --build
+  server:
+    profiles: [server]
+    build: .
+    image: relay-authz
+    environment:
+      # pgx defaults to one connection per CPU, too few for concurrent checks that each wait on Postgres.
+      DATABASE_URL: postgres://authz:authz@postgres:5432/authz?pool_max_conns=32
+      # REDIS_URL= (set but empty) runs the server uncached, for the baseline.
+      REDIS_URL: ${REDIS_URL-redis://redis:6379}
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # docker compose --profile loadtest run --rm k6 run -e RATE=500 /scripts/check.js
+  # k6 runs inside Docker's network because Docker Desktop's port forwarding, not the
+  # server, becomes the bottleneck when it sends thousands of requests a second from the host.
+  k6:
+    profiles: [loadtest]
+    image: grafana/k6:1.4.0
+    environment:
+      BASE_URL: http://server:8080
+    volumes:
+      - ./loadtest:/scripts:ro
 
 volumes:
   pgdata:
