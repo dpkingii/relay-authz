@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"fmt"
+	"math/rand/v2"
 	"os"
 	"slices"
 	"testing"
@@ -14,17 +16,16 @@ func newStore(t *testing.T) *Store {
 	if url == "" {
 		t.Skip("DATABASE_URL not set; run `docker compose up -d` first")
 	}
-	ctx := context.Background()
-	s, err := New(ctx, url)
+	s, err := New(context.Background(), url)
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(s.Close)
-	if _, err := s.pool.Exec(ctx, "truncate tuples"); err != nil {
-		t.Fatal(err)
-	}
 	return s
 }
+
+// uniqueID keeps tests that share the database from seeing each other's tuples.
+func uniqueID() string { return fmt.Sprintf("t%x", rand.Uint64()) }
 
 func mustParse(t *testing.T, s string) tuple.Tuple {
 	tup, err := tuple.Parse(s)
@@ -34,12 +35,8 @@ func mustParse(t *testing.T, s string) tuple.Tuple {
 	return tup
 }
 
-func subjects(t *testing.T, s *Store, object, relation string) []string {
-	obj, err := tuple.ParseObject(object)
-	if err != nil {
-		t.Fatal(err)
-	}
-	subs, err := s.ReadSubjects(context.Background(), obj, relation)
+func subjects(t *testing.T, s *Store, object tuple.Object, relation string) []string {
+	subs, err := s.ReadSubjects(context.Background(), object, relation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,27 +51,29 @@ func subjects(t *testing.T, s *Store, object, relation string) []string {
 func TestWriteReadDelete(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
+	doc, other := uniqueID(), uniqueID()
 	for _, tup := range []string{
-		"document:budget#viewer@user:alice",
-		"document:budget#viewer@group:finance#member",
-		"document:budget#editor@user:bob",
-		"document:roadmap#viewer@user:carol",
+		"document:" + doc + "#viewer@user:alice",
+		"document:" + doc + "#viewer@group:finance#member",
+		"document:" + doc + "#editor@user:bob",
+		"document:" + other + "#viewer@user:carol",
 	} {
-		if err := s.Write(ctx, mustParse(t, tup)); err != nil {
+		if _, err := s.Write(ctx, mustParse(t, tup)); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	got := subjects(t, s, "document:budget", "viewer")
+	object := tuple.Object{Type: "document", ID: doc}
+	got := subjects(t, s, object, "viewer")
 	want := []string{"group:finance#member", "user:alice"}
 	if !slices.Equal(got, want) {
 		t.Errorf("viewers = %v, want %v", got, want)
 	}
 
-	if err := s.Delete(ctx, mustParse(t, "document:budget#viewer@user:alice")); err != nil {
+	if _, err := s.Delete(ctx, mustParse(t, "document:"+doc+"#viewer@user:alice")); err != nil {
 		t.Fatal(err)
 	}
-	got = subjects(t, s, "document:budget", "viewer")
+	got = subjects(t, s, object, "viewer")
 	want = []string{"group:finance#member"}
 	if !slices.Equal(got, want) {
 		t.Errorf("viewers after delete = %v, want %v", got, want)
@@ -84,21 +83,49 @@ func TestWriteReadDelete(t *testing.T) {
 func TestWriteAndDeleteAreIdempotent(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
-	tup := mustParse(t, "document:budget#viewer@user:alice")
+	doc := uniqueID()
+	tup := mustParse(t, "document:"+doc+"#viewer@user:alice")
+	object := tuple.Object{Type: "document", ID: doc}
 	for range 2 {
-		if err := s.Write(ctx, tup); err != nil {
+		if _, err := s.Write(ctx, tup); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if got := subjects(t, s, "document:budget", "viewer"); len(got) != 1 {
+	if got := subjects(t, s, object, "viewer"); len(got) != 1 {
 		t.Errorf("viewers after writing twice = %v, want one", got)
 	}
 	for range 2 {
-		if err := s.Delete(ctx, tup); err != nil {
+		if _, err := s.Delete(ctx, tup); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if got := subjects(t, s, "document:budget", "viewer"); len(got) != 0 {
+	if got := subjects(t, s, object, "viewer"); len(got) != 0 {
 		t.Errorf("viewers after deleting = %v, want none", got)
+	}
+}
+
+func TestEveryChangeBumpsTheRevision(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	tup := mustParse(t, "document:"+uniqueID()+"#viewer@user:alice")
+
+	before, err := s.Revision(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	written, err := s.Write(ctx, tup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deleted, err := s.Delete(ctx, tup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	latest, err := s.Revision(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !(before < written && written < deleted && deleted <= latest) {
+		t.Errorf("revisions before %d, write %d, delete %d, latest %d: want increasing", before, written, deleted, latest)
 	}
 }

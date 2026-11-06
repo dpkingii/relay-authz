@@ -22,8 +22,18 @@ jobs:
           --health-interval 2s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 10
     env:
       DATABASE_URL: postgres://authz:authz@localhost:5432/authz
+      REDIS_URL: redis://localhost:6379
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-go@v6

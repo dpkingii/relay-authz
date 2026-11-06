@@ -7,37 +7,40 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 
+	"github.com/dpkingii/relay-authz/internal/cache"
 	"github.com/dpkingii/relay-authz/internal/check"
 	"github.com/dpkingii/relay-authz/internal/rules"
 	"github.com/dpkingii/relay-authz/internal/store"
 	"github.com/dpkingii/relay-authz/internal/tuple"
 )
 
-func New(s *store.Store, rs rules.Rules) http.Handler {
-	checker := check.Checker{Reader: s, Rules: rs}
+func New(s *store.Store, rs rules.Rules, checker cache.Checker) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /v1/tuples", func(w http.ResponseWriter, r *http.Request) {
 		t, ok := readTuple(w, r, rs)
 		if !ok {
 			return
 		}
-		if err := s.Write(r.Context(), t); err != nil {
+		rev, err := s.Write(r.Context(), t)
+		if err != nil {
 			internalError(w, err)
 			return
 		}
-		w.WriteHeader(http.StatusNoContent)
+		writeJSON(w, map[string]int64{"revision": rev})
 	})
 	mux.HandleFunc("DELETE /v1/tuples", func(w http.ResponseWriter, r *http.Request) {
 		t, ok := readTuple(w, r, rs)
 		if !ok {
 			return
 		}
-		if err := s.Delete(r.Context(), t); err != nil {
+		rev, err := s.Delete(r.Context(), t)
+		if err != nil {
 			internalError(w, err)
 			return
 		}
-		w.WriteHeader(http.StatusNoContent)
+		writeJSON(w, map[string]int64{"revision": rev})
 	})
 	mux.HandleFunc("GET /v1/check", func(w http.ResponseWriter, r *http.Request) {
 		q := r.URL.Query()
@@ -60,17 +63,35 @@ func New(s *store.Store, rs rules.Rules) http.Handler {
 			http.Error(w, fmt.Sprintf("unknown type %s", user.Type), http.StatusBadRequest)
 			return
 		}
-		allowed, err := checker.Check(r.Context(), object, relation, user)
-		if errors.Is(err, check.ErrTooDeep) {
+
+		atLeast := cache.Latest
+		if q.Has("at_least") {
+			atLeast, err = strconv.ParseInt(q.Get("at_least"), 10, 64)
+			if err != nil || atLeast < 0 {
+				http.Error(w, "at_least must be a revision number", http.StatusBadRequest)
+				return
+			}
+		}
+
+		res, err := checker.Check(r.Context(), object, relation, user, atLeast)
+		switch {
+		case errors.Is(err, cache.ErrFutureRevision):
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		case errors.Is(err, check.ErrTooDeep):
 			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
 			return
-		}
-		if err != nil {
+		case err != nil:
 			internalError(w, err)
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]bool{"allowed": allowed})
+		// Lets a load test measure the cache hit rate.
+		if res.Cached {
+			w.Header().Set("X-Cache", "hit")
+		} else {
+			w.Header().Set("X-Cache", "miss")
+		}
+		writeJSON(w, map[string]any{"allowed": res.Allowed, "revision": res.Revision})
 	})
 	return mux
 }
@@ -94,6 +115,11 @@ func readTuple(w http.ResponseWriter, r *http.Request, rs rules.Rules) (tuple.Tu
 		return tuple.Tuple{}, false
 	}
 	return t, true
+}
+
+func writeJSON(w http.ResponseWriter, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(v)
 }
 
 func internalError(w http.ResponseWriter, err error) {

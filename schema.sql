@@ -9,3 +9,11 @@ create table tuples (
   -- The leading columns (object, relation) are exactly what a check looks up.
   primary key (object_type, object_id, relation, subject_type, subject_id, subject_relation)
 );
+
+-- One row counting every write and delete. Each change bumps it in the same
+-- transaction, so seeing revision N means every change up to N is committed.
+create table revision (
+  only_row boolean primary key default true check (only_row),
+  value    bigint not null
+);
+insert into revision (value) values (0);

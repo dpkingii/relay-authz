@@ -5,12 +5,23 @@ services:
       POSTGRES_USER: authz
       POSTGRES_PASSWORD: authz
       POSTGRES_DB: authz
-    # 5434 so it doesn't collide with a Postgres already running on the host.
+    # 5434 and 6380 so they don't collide with other Postgres and Redis instances on the host.
     ports:
       - "5434:5432"
     volumes:
       - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U authz
+      interval: 2s
+
+  redis:
+    image: redis:7
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: redis-cli ping
+      interval: 2s
 
 volumes:
   pgdata:

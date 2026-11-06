@@ -28,24 +28,42 @@ func New(ctx context.Context, databaseURL string) (*Store, error) {
 
 func (s *Store) Close() { s.pool.Close() }
 
-// Write adds a tuple. Writing one that already exists is a no-op.
-func (s *Store) Write(ctx context.Context, t tuple.Tuple) error {
-	_, err := s.pool.Exec(ctx, `
+// Write adds a tuple and returns the new revision. Writing one that already exists
+// changes nothing but still bumps the revision.
+func (s *Store) Write(ctx context.Context, t tuple.Tuple) (int64, error) {
+	return s.change(ctx, `
 		insert into tuples (object_type, object_id, relation, subject_type, subject_id, subject_relation)
 		values ($1, $2, $3, $4, $5, $6)
-		on conflict do nothing`,
-		t.Object.Type, t.Object.ID, t.Relation, t.Subject.Type, t.Subject.ID, t.Subject.Relation)
-	return err
+		on conflict do nothing`, t)
 }
 
-// Delete removes a tuple. Deleting one that doesn't exist is a no-op.
-func (s *Store) Delete(ctx context.Context, t tuple.Tuple) error {
-	_, err := s.pool.Exec(ctx, `
+// Delete removes a tuple and returns the new revision. Deleting one that doesn't
+// exist changes nothing but still bumps the revision.
+func (s *Store) Delete(ctx context.Context, t tuple.Tuple) (int64, error) {
+	return s.change(ctx, `
 		delete from tuples
 		where object_type = $1 and object_id = $2 and relation = $3
-		  and subject_type = $4 and subject_id = $5 and subject_relation = $6`,
-		t.Object.Type, t.Object.ID, t.Relation, t.Subject.Type, t.Subject.ID, t.Subject.Relation)
-	return err
+		  and subject_type = $4 and subject_id = $5 and subject_relation = $6`, t)
+}
+
+func (s *Store) change(ctx context.Context, sql string, t tuple.Tuple) (int64, error) {
+	var rev int64
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, sql,
+			t.Object.Type, t.Object.ID, t.Relation, t.Subject.Type, t.Subject.ID, t.Subject.Relation); err != nil {
+			return err
+		}
+		// The row lock this takes is held until commit, so revisions commit in order.
+		return tx.QueryRow(ctx, "update revision set value = value + 1 returning value").Scan(&rev)
+	})
+	return rev, err
+}
+
+// Revision returns the latest committed revision.
+func (s *Store) Revision(ctx context.Context) (int64, error) {
+	var rev int64
+	err := s.pool.QueryRow(ctx, "select value from revision").Scan(&rev)
+	return rev, err
 }
 
 // ReadSubjects returns every subject with the relation on the object.
