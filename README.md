@@ -1,4 +1,4 @@
-# zanzibar-authz
+# relay-authz
 
 A relationship-based authorization service in Go, modeled on Google's [Zanzibar paper](https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/). It answers "can this user do this action on this object?" from relation tuples stored in PostgreSQL.
 

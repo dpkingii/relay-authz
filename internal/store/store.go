@@ -7,7 +7,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/dpkingii/zanzibar-authz/internal/tuple"
+	"github.com/dpkingii/relay-authz/internal/tuple"
 )
 
 type Store struct {

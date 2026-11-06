@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/dpkingii/zanzibar-authz/internal/api"
-	"github.com/dpkingii/zanzibar-authz/internal/store"
+	"github.com/dpkingii/relay-authz/internal/api"
+	"github.com/dpkingii/relay-authz/internal/store"
 )
 
 func main() {

@@ -6,9 +6,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/dpkingii/zanzibar-authz/internal/check"
-	"github.com/dpkingii/zanzibar-authz/internal/store"
-	"github.com/dpkingii/zanzibar-authz/internal/tuple"
+	"github.com/dpkingii/relay-authz/internal/check"
+	"github.com/dpkingii/relay-authz/internal/store"
+	"github.com/dpkingii/relay-authz/internal/tuple"
 )
 
 func New(s *store.Store) http.Handler {

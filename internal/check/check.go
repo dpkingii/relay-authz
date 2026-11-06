@@ -5,7 +5,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/dpkingii/zanzibar-authz/internal/tuple"
+	"github.com/dpkingii/relay-authz/internal/tuple"
 )
 
 // Reader is the one store query a check needs. The Postgres store implements it,

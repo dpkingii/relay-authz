@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/dpkingii/zanzibar-authz/internal/tuple"
+	"github.com/dpkingii/relay-authz/internal/tuple"
 )
 
 func newStore(t *testing.T) *Store {

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/dpkingii/zanzibar-authz/internal/tuple"
+	"github.com/dpkingii/relay-authz/internal/tuple"
 )
 
 // memReader is an in-memory Reader over a fixed list of tuples.

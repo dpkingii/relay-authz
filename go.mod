@@ -1,4 +1,4 @@
-module github.com/dpkingii/zanzibar-authz
+module github.com/dpkingii/relay-authz
 
 go 1.27.3
 
