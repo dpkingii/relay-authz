@@ -1,0 +1,9 @@
+%% Rendered for the README in light and dark, from this folder:
+%%   npx -y @mermaid-js/mermaid-cli@11.4.2 -c mermaid.json -t default -b transparent -i caching.mmd -o caching-light.svg
+%%   npx -y @mermaid-js/mermaid-cli@11.4.2 -c mermaid.json -t dark -b transparent -i caching.mmd -o caching-dark.svg
+flowchart LR
+  req["check"] --> rev["required revision:<br/>at_least, or a recent snapshot"]
+  rev --> cache{"cached at that<br/>revision or newer?"}
+  cache -- hit --> out["allowed + revision"]
+  cache -- miss --> walk["walk the tuple<br/>graph in Postgres"]
+  walk --> store["cache the result<br/>with its revision"] --> out

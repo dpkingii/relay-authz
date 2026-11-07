@@ -59,39 +59,19 @@ document:
 
 Together they form a graph. Here alice is in finance, finance can view a folder, the budget is in that folder, and alice owns the roadmap:
 
-```mermaid
-flowchart LR
-  alice(["user:alice"])
-  member["group:finance<br/>member"]
-  folder["folder:finance<br/>viewer"]
-  budget["document:budget<br/>viewer"]
-  owner["document:roadmap<br/>owner"]
-  editor["document:roadmap<br/>editor"]
-  viewer["document:roadmap<br/>viewer"]
-
-  alice -- tuple --> member
-  member -- tuple --> folder
-  folder -- "via parent" --> budget
-  alice -- tuple --> owner
-  owner -- implied_by --> editor
-  editor -- implied_by --> viewer
-
-  classDef doc stroke-width:3px
-  class budget,viewer doc
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/check-graph-dark.svg">
+  <img alt="user:alice reaches document:budget viewer through group:finance member and folder:finance viewer, and reaches document:roadmap viewer through owner and editor" src="docs/diagrams/check-graph-light.svg">
+</picture>
 
 A check starts at a document and searches back toward alice, stopping at the first path it finds. It skips any `object#relation` it has already visited, which handles cycles like two groups containing each other, and gives up after 25 hops.
 
 ### Revisions and caching
 
-```mermaid
-flowchart LR
-  req["check"] --> rev["required revision:<br/>at_least, or a recent snapshot"]
-  rev --> cache{"cached at that<br/>revision or newer?"}
-  cache -- hit --> out["allowed + revision"]
-  cache -- miss --> walk["walk the tuple<br/>graph in Postgres"]
-  walk --> store["cache the result<br/>with its revision"] --> out
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/diagrams/caching-dark.svg">
+  <img alt="A check works out its required revision, then either returns a cached result at that revision or newer, or walks the tuple graph in Postgres and caches the result with its revision" src="docs/diagrams/caching-light.svg">
+</picture>
 
 Every write bumps a global revision in the same transaction and returns it. Results are cached in Redis with the revision they were computed at.
 
@@ -177,4 +157,4 @@ After changing `schema.sql`, reset the database with `docker compose down -v && 
 | `schema.sql` | the `tuples` and `revision` tables |
 | `examples/clinic.yaml` | rules for a clinic's records |
 | `loadtest/` | k6 script, the script that runs every mode, the summary script, and results |
-| `docs/` | benchmark results, the demo GIF and the [vhs](https://github.com/charmbracelet/vhs) script that records it |
+| `docs/` | benchmark results, the README diagrams, the demo GIF and the [vhs](https://github.com/charmbracelet/vhs) script that records it |

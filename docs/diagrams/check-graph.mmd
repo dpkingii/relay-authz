@@ -1,0 +1,21 @@
+%% Rendered for the README in light and dark, from this folder:
+%%   npx -y @mermaid-js/mermaid-cli@11.4.2 -c mermaid.json -t default -b transparent -i check-graph.mmd -o check-graph-light.svg
+%%   npx -y @mermaid-js/mermaid-cli@11.4.2 -c mermaid.json -t dark -b transparent -i check-graph.mmd -o check-graph-dark.svg
+flowchart LR
+  alice(["user:alice"])
+  member["group:finance<br/>member"]
+  folder["folder:finance<br/>viewer"]
+  budget["document:budget<br/>viewer"]
+  owner["document:roadmap<br/>owner"]
+  editor["document:roadmap<br/>editor"]
+  viewer["document:roadmap<br/>viewer"]
+
+  alice -- tuple --> member
+  member -- tuple --> folder
+  folder -- "via parent" --> budget
+  alice -- tuple --> owner
+  owner -- implied_by --> editor
+  editor -- implied_by --> viewer
+
+  classDef doc stroke-width:3px
+  class budget,viewer doc
