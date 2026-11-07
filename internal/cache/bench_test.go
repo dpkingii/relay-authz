@@ -73,6 +73,7 @@ func BenchmarkCheck(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
+	revs := &Revisions{Read: s.Revision}
 
 	cases := []struct{ name, doc, user string }{
 		{"direct", "direct", id},
@@ -90,9 +91,9 @@ func BenchmarkCheck(b *testing.B) {
 			c       Checker
 			atLeast int64
 		}{
-			{"uncached", Checker{Uncached: check.Checker{Reader: reader, Rules: rs}, Revision: s.Revision}, Latest},
-			{"cached", Checker{Uncached: check.Checker{Reader: reader, Rules: rs}, Revision: s.Revision, Redis: rdb, Prefix: id + ":"}, Latest},
-			{"cached-at-least", Checker{Uncached: check.Checker{Reader: reader, Rules: rs}, Revision: s.Revision, Redis: rdb, Prefix: id + ":"}, setup},
+			{"uncached", Checker{Uncached: check.Checker{Reader: reader, Rules: rs}, Revisions: revs}, Recent},
+			{"cached", Checker{Uncached: check.Checker{Reader: reader, Rules: rs}, Revisions: revs, Redis: rdb, Prefix: id + ":"}, Recent},
+			{"cached-at-least", Checker{Uncached: check.Checker{Reader: reader, Rules: rs}, Revisions: revs, Redis: rdb, Prefix: id + ":"}, setup},
 		}
 		for _, v := range variants {
 			b.Run(tc.name+"/"+v.name, func(b *testing.B) {

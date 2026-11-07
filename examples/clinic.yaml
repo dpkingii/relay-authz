@@ -1,0 +1,28 @@
+# Rules for a clinic's records, to show the same service modeling another domain:
+#   RULES=examples/clinic.yaml go run ./cmd/server
+user: {}
+
+team:
+  member:
+
+patient:
+  self:          # the patient's own account
+  primary:       # their primary care physician
+  care_team:     # teams treating them
+  referred:      # specialists they've been referred to
+  viewer:
+    implied_by: [self, primary, referred]
+    via:
+      - {tupleset: care_team, relation: member}
+
+record:
+  patient:       # whose record it is
+  author:
+  editor:
+    implied_by: [author]
+    via:
+      - {tupleset: patient, relation: primary}
+  viewer:
+    implied_by: [editor]
+    via:
+      - {tupleset: patient, relation: viewer}

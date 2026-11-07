@@ -64,7 +64,7 @@ func New(s *store.Store, rs rules.Rules, checker cache.Checker) http.Handler {
 			return
 		}
 
-		atLeast := cache.Latest
+		atLeast := cache.Recent
 		if q.Has("at_least") {
 			atLeast, err = strconv.ParseInt(q.Get("at_least"), 10, 64)
 			if err != nil || atLeast < 0 {
@@ -92,6 +92,44 @@ func New(s *store.Store, rs rules.Rules, checker cache.Checker) http.Handler {
 			w.Header().Set("X-Cache", "miss")
 		}
 		writeJSON(w, map[string]any{"allowed": res.Allowed, "revision": res.Revision})
+	})
+	mux.HandleFunc("GET /v1/lookup", func(w http.ResponseWriter, r *http.Request) {
+		q := r.URL.Query()
+		user, err := tuple.ParseObject(q.Get("user"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		typ, relation := q.Get("type"), q.Get("relation")
+		if !rs.HasRelation(typ, relation) {
+			http.Error(w, fmt.Sprintf("unknown relation %s#%s", typ, relation), http.StatusBadRequest)
+			return
+		}
+		if !rs.HasType(user.Type) {
+			http.Error(w, fmt.Sprintf("unknown type %s", user.Type), http.StatusBadRequest)
+			return
+		}
+
+		// Read before any tuples, so the answer reflects every change up to it.
+		rev, err := s.Revision(r.Context())
+		if err != nil {
+			internalError(w, err)
+			return
+		}
+		objects, err := check.Lookup{Reader: s, Rules: rs}.Objects(r.Context(), typ, relation, user)
+		switch {
+		case errors.Is(err, check.ErrTooDeep):
+			http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+			return
+		case err != nil:
+			internalError(w, err)
+			return
+		}
+		out := []string{}
+		for _, o := range objects {
+			out = append(out, o.String())
+		}
+		writeJSON(w, map[string]any{"objects": out, "revision": rev})
 	})
 	return mux
 }

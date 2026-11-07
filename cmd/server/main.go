@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 
@@ -45,11 +46,20 @@ func main() {
 	}
 	defer s.Close()
 
+	// 0 by default, so a check without at_least always reflects every committed change,
+	// including a revoke a moment ago. Raising it trades that for cache hits under writes.
+	var maxStaleness time.Duration
+	if v := os.Getenv("MAX_STALENESS"); v != "" {
+		if maxStaleness, err = time.ParseDuration(v); err != nil {
+			log.Fatalf("MAX_STALENESS: %v", err)
+		}
+	}
+
 	rulesHash := sha256.Sum256(rulesYAML)
 	checker := cache.Checker{
-		Uncached: check.Checker{Reader: s, Rules: rs},
-		Revision: s.Revision,
-		Prefix:   fmt.Sprintf("check:%x:", rulesHash[:8]),
+		Uncached:  check.Checker{Reader: s, Rules: rs},
+		Revisions: &cache.Revisions{Read: s.Revision, MaxStaleness: maxStaleness},
+		Prefix:    fmt.Sprintf("check:%x:", rulesHash[:8]),
 	}
 	// Without REDIS_URL the server runs uncached, which is the baseline for benchmarks.
 	if url := os.Getenv("REDIS_URL"); url != "" {
@@ -61,6 +71,6 @@ func main() {
 		defer checker.Redis.Close()
 	}
 
-	log.Printf("listening on %s (cache: %t)", addr, checker.Redis != nil)
+	log.Printf("listening on %s (cache: %t, max staleness: %s)", addr, checker.Redis != nil, maxStaleness)
 	log.Fatal(http.ListenAndServe(addr, api.New(s, rs, checker)))
 }

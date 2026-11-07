@@ -34,6 +34,7 @@ services:
       DATABASE_URL: postgres://authz:authz@postgres:5432/authz?pool_max_conns=32
       # REDIS_URL= (set but empty) runs the server uncached, for the baseline.
       REDIS_URL: ${REDIS_URL-redis://redis:6379}
+      MAX_STALENESS: ${MAX_STALENESS:-0s}
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:

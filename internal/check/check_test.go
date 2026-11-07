@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
+	"slices"
 	"testing"
 
 	"github.com/dpkingii/relay-authz/internal/rules"
@@ -24,9 +25,23 @@ func (m memReader) ReadSubjects(_ context.Context, object tuple.Object, relation
 	return out, nil
 }
 
+func (m memReader) ReadBySubjects(_ context.Context, subjects []tuple.Object) ([]tuple.Tuple, error) {
+	var out []tuple.Tuple
+	for _, t := range m {
+		if slices.Contains(subjects, tuple.Object{Type: t.Subject.Type, ID: t.Subject.ID}) {
+			out = append(out, t)
+		}
+	}
+	return out, nil
+}
+
 type failingReader struct{}
 
 func (failingReader) ReadSubjects(context.Context, tuple.Object, string) ([]tuple.Subject, error) {
+	return nil, errors.New("database down")
+}
+
+func (failingReader) ReadBySubjects(context.Context, []tuple.Object) ([]tuple.Tuple, error) {
 	return nil, errors.New("database down")
 }
 
@@ -58,8 +73,9 @@ func object(t *testing.T, s string) tuple.Object {
 	return o
 }
 
-func TestCheck(t *testing.T) {
-	c := Checker{Rules: repoRules(t), Reader: tuples(t,
+// example is the tuple set TestCheck and TestLookup share.
+func example(t *testing.T) memReader {
+	return tuples(t,
 		"document:budget#viewer@user:alice",
 		"document:budget#editor@user:bob",
 		"document:budget#owner@user:olga",
@@ -82,7 +98,11 @@ func TestCheck(t *testing.T) {
 		"group:b#member@group:a#member",
 		"group:b#member@user:yan",
 		"document:loop#viewer@group:a#member",
-	)}
+	)
+}
+
+func TestCheck(t *testing.T) {
+	c := Checker{Rules: repoRules(t), Reader: example(t)}
 	tests := []struct {
 		name     string
 		object   string

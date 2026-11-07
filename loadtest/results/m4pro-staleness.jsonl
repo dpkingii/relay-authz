@@ -1,0 +1,12 @@
+{"mode":"cached-writes","max_staleness":"0s","rate":4000,"write_ratio":0.01,"at_least":false,"checks":237197,"hit_rate":0.01,"p50":2.95,"p95":4.9,"p99":13.08,"dropped":453,"failed":0}
+{"mode":"cached-writes","max_staleness":"100ms","rate":4000,"write_ratio":0.01,"at_least":false,"checks":236916,"hit_rate":0.01,"p50":2.72,"p95":5.05,"p99":18.97,"dropped":707,"failed":0}
+{"mode":"cached-writes","max_staleness":"1s","rate":4000,"write_ratio":0.01,"at_least":false,"checks":237015,"hit_rate":0.06,"p50":2.59,"p95":4.39,"p99":13.75,"dropped":569,"failed":0}
+{"mode":"cached-writes","max_staleness":"5s","rate":4000,"write_ratio":0.01,"at_least":false,"checks":237428,"hit_rate":0.14,"p50":2.36,"p95":3.84,"p99":5.38,"dropped":139,"failed":0}
+{"mode":"cached-writes","max_staleness":"0s","rate":4000,"write_ratio":0.01,"at_least":false,"checks":236500,"hit_rate":0.01,"p50":3.28,"p95":14,"p99":44.37,"dropped":1171,"failed":0}
+{"mode":"cached-writes","max_staleness":"100ms","rate":4000,"write_ratio":0.01,"at_least":false,"checks":237374,"hit_rate":0.01,"p50":2.57,"p95":3.79,"p99":5.01,"dropped":169,"failed":0}
+{"mode":"cached-writes","max_staleness":"1s","rate":4000,"write_ratio":0.01,"at_least":false,"checks":237381,"hit_rate":0.06,"p50":2.5,"p95":3.85,"p99":5.24,"dropped":268,"failed":0}
+{"mode":"cached-writes","max_staleness":"5s","rate":4000,"write_ratio":0.01,"at_least":false,"checks":237186,"hit_rate":0.14,"p50":2.2,"p95":3.58,"p99":5.24,"dropped":362,"failed":0}
+{"mode":"cached-writes","max_staleness":"0s","rate":4000,"write_ratio":0.01,"at_least":false,"checks":237332,"hit_rate":0.01,"p50":2.76,"p95":3.98,"p99":5.3,"dropped":230,"failed":0}
+{"mode":"cached-writes","max_staleness":"100ms","rate":4000,"write_ratio":0.01,"at_least":false,"checks":236897,"hit_rate":0.01,"p50":2.65,"p95":4.26,"p99":9.34,"dropped":716,"failed":0}
+{"mode":"cached-writes","max_staleness":"1s","rate":4000,"write_ratio":0.01,"at_least":false,"checks":224113,"hit_rate":0.06,"p50":2.6,"p95":5.66,"p99":60.12,"dropped":13610,"failed":0}
+{"mode":"cached-writes","max_staleness":"5s","rate":4000,"write_ratio":0.01,"at_least":false,"checks":218834,"hit_rate":0.14,"p50":2.42,"p95":4.96,"p99":75.47,"dropped":18987,"failed":0}

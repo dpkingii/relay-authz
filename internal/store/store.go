@@ -81,3 +81,24 @@ func (s *Store) ReadSubjects(ctx context.Context, object tuple.Object, relation 
 		return s, err
 	})
 }
+
+// ReadBySubjects returns every tuple whose subject is one of the objects, with any subject relation.
+func (s *Store) ReadBySubjects(ctx context.Context, subjects []tuple.Object) ([]tuple.Tuple, error) {
+	types, ids := make([]string, len(subjects)), make([]string, len(subjects))
+	for i, o := range subjects {
+		types[i], ids[i] = o.Type, o.ID
+	}
+	rows, err := s.pool.Query(ctx, `
+		select t.object_type, t.object_id, t.relation, t.subject_type, t.subject_id, t.subject_relation
+		from tuples t
+		join unnest($1::text[], $2::text[]) as s(type, id) on t.subject_type = s.type and t.subject_id = s.id`,
+		types, ids)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(row pgx.CollectableRow) (tuple.Tuple, error) {
+		var t tuple.Tuple
+		err := row.Scan(&t.Object.Type, &t.Object.ID, &t.Relation, &t.Subject.Type, &t.Subject.ID, &t.Subject.Relation)
+		return t, err
+	})
+}

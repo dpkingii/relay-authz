@@ -9,6 +9,8 @@ create table tuples (
   -- The leading columns (object, relation) are exactly what a check looks up.
   primary key (object_type, object_id, relation, subject_type, subject_id, subject_relation)
 );
+-- A lookup walks backward, finding the tuples that name a subject.
+create index tuples_by_subject on tuples (subject_type, subject_id);
 
 -- One row counting every write and delete. Each change bumps it in the same
 -- transaction, so seeing revision N means every change up to N is committed.

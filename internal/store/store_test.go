@@ -104,6 +104,42 @@ func TestWriteAndDeleteAreIdempotent(t *testing.T) {
 	}
 }
 
+func TestReadBySubjects(t *testing.T) {
+	s := newStore(t)
+	ctx := context.Background()
+	a, b, other := uniqueID(), uniqueID(), uniqueID()
+	for _, tup := range []string{
+		"document:d" + a + "#viewer@user:" + a,
+		"document:d" + a + "#viewer@group:" + b + "#member",
+		"folder:f" + a + "#parent@folder:" + b,
+		"document:d" + other + "#viewer@user:" + other,
+	} {
+		if _, err := s.Write(ctx, mustParse(t, tup)); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	ts, err := s.ReadBySubjects(ctx, []tuple.Object{
+		{Type: "user", ID: a}, {Type: "group", ID: b}, {Type: "folder", ID: b}, {Type: "user", ID: "nobody" + a},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, tup := range ts {
+		got = append(got, tup.String())
+	}
+	slices.Sort(got)
+	want := []string{
+		"document:d" + a + "#viewer@group:" + b + "#member",
+		"document:d" + a + "#viewer@user:" + a,
+		"folder:f" + a + "#parent@folder:" + b,
+	}
+	if !slices.Equal(got, want) {
+		t.Errorf("tuples = %v, want %v", got, want)
+	}
+}
+
 func TestEveryChangeBumpsTheRevision(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()

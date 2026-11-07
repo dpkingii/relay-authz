@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -42,10 +43,10 @@ func newServer(t *testing.T) *httptest.Server {
 		t.Fatal(err)
 	}
 	srv := httptest.NewServer(New(s, rs, cache.Checker{
-		Uncached: check.Checker{Reader: s, Rules: rs},
-		Revision: s.Revision,
-		Redis:    rdb,
-		Prefix:   fmt.Sprintf("test:%x:", rand.Uint64()),
+		Uncached:  check.Checker{Reader: s, Rules: rs},
+		Revisions: &cache.Revisions{Read: s.Revision},
+		Redis:     rdb,
+		Prefix:    fmt.Sprintf("test:%x:", rand.Uint64()),
 	}))
 	t.Cleanup(srv.Close)
 	return srv
@@ -120,6 +121,54 @@ func TestRevokedAccessIsNeverServedFromCache(t *testing.T) {
 	}
 	if res := checkAt(t, srv, doc, "viewer", user, fmt.Sprint(revoked)); res.Allowed || res.Revision < revoked {
 		t.Errorf("check at the revoke's revision = %+v, want deny at revision >= %d", res, revoked)
+	}
+}
+
+func TestLookup(t *testing.T) {
+	srv := newServer(t)
+	id := fmt.Sprintf("t%x", rand.Uint64())
+	user := "user:" + id
+	change(t, srv, "POST", "document:"+id+"-a#parent@folder:"+id)
+	change(t, srv, "POST", "folder:"+id+"#viewer@group:"+id+"#member")
+	change(t, srv, "POST", "group:"+id+"#member@"+user)
+	change(t, srv, "POST", "document:"+id+"-b#owner@"+user)
+	change(t, srv, "POST", "document:"+id+"-c#owner@user:"+id+"-other")
+	revoked := change(t, srv, "DELETE", "document:"+id+"-b#owner@"+user)
+
+	q := url.Values{"type": {"document"}, "relation": {"viewer"}, "user": {user}}
+	resp, err := http.Get(srv.URL + "/v1/lookup?" + q.Encode())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var body struct {
+		Objects  []string
+		Revision int64
+	}
+	if resp.StatusCode != http.StatusOK || json.NewDecoder(resp.Body).Decode(&body) != nil {
+		t.Fatalf("lookup: status %d", resp.StatusCode)
+	}
+	if want := []string{"document:" + id + "-a"}; !slices.Equal(body.Objects, want) || body.Revision < revoked {
+		t.Errorf("lookup = %+v, want %v at revision >= %d", body, want, revoked)
+	}
+}
+
+func TestLookupRejectsUnknownRelations(t *testing.T) {
+	srv := newServer(t)
+	for _, q := range []string{
+		"type=document&relation=reader&user=user:x",
+		"type=memo&relation=viewer&user=user:x",
+		"type=document&relation=viewer&user=robot:x",
+		"type=document&relation=viewer&user=nope",
+	} {
+		resp, err := http.Get(srv.URL + "/v1/lookup?" + q)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Errorf("%s: status %d, want 400", q, resp.StatusCode)
+		}
 	}
 }
 

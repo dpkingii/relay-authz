@@ -7,6 +7,7 @@ import (
 	"math/rand/v2"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 
@@ -62,9 +63,9 @@ func newChecker(t testing.TB, rdb *redis.Client, f *fakeStore) Checker {
 		t.Fatal(err)
 	}
 	return Checker{
-		Uncached: check.Checker{Reader: f, Rules: rs},
-		Revision: f.Revision,
-		Redis:    rdb,
+		Uncached:  check.Checker{Reader: f, Rules: rs},
+		Revisions: &Revisions{Read: f.Revision},
+		Redis:     rdb,
 		// A fresh prefix per test keeps runs from reading each other's entries.
 		Prefix: fmt.Sprintf("test:%x:", rand.Uint64()),
 	}
@@ -111,20 +112,64 @@ func TestRevokeIsSeenAtTheDeleteRevision(t *testing.T) {
 	}
 }
 
-func TestLatestSeesEveryChange(t *testing.T) {
+func TestRecentWithoutStalenessSeesEveryChange(t *testing.T) {
 	f := &fakeStore{tuples: []tuple.Tuple{grant}, revision: 1}
 	c := newChecker(t, redisClient(t), f)
-	if res := checkAlice(t, c, Latest); !res.Allowed || res.Revision != 1 {
+	if res := checkAlice(t, c, Recent); !res.Allowed || res.Revision != 1 {
 		t.Fatalf("first check = %+v, want allow at revision 1", res)
 	}
-	if res := checkAlice(t, c, Latest); !res.Cached {
+	if res := checkAlice(t, c, Recent); !res.Cached {
 		t.Errorf("repeat check with no writes = %+v, want a cache hit", res)
 	}
 
 	f.tuples, f.revision = nil, 2
 
-	if res := checkAlice(t, c, Latest); res.Allowed || res.Cached || res.Revision != 2 {
+	if res := checkAlice(t, c, Recent); res.Allowed || res.Cached || res.Revision != 2 {
 		t.Errorf("check after revoke = %+v, want a fresh deny at revision 2", res)
+	}
+}
+
+func TestRecentChecksShareASnapshot(t *testing.T) {
+	f := &fakeStore{tuples: []tuple.Tuple{grant}, revision: 1}
+	c := newChecker(t, redisClient(t), f)
+	c.Revisions.MaxStaleness = time.Hour
+	checkAlice(t, c, Recent)
+
+	f.revision = 2 // a write somewhere else
+
+	if res := checkAlice(t, c, Recent); !res.Allowed || !res.Cached || res.Revision != 1 {
+		t.Errorf("check within the window = %+v, want the cached allow from revision 1", res)
+	}
+
+	f.tuples, f.revision = nil, 3 // the revoke
+
+	// at_least still sees the revoke, however stale the snapshot.
+	if res := checkAlice(t, c, 3); res.Allowed || res.Cached || res.Revision != 3 {
+		t.Errorf("check at the revoke's revision = %+v, want a fresh deny at revision 3", res)
+	}
+}
+
+func TestSnapshotMovesAfterMaxStaleness(t *testing.T) {
+	f := &fakeStore{revision: 1}
+	r := &Revisions{Read: f.Revision, MaxStaleness: 50 * time.Millisecond}
+	snapshot := func() int64 {
+		t.Helper()
+		rev, err := r.Snapshot(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return rev
+	}
+	if got := snapshot(); got != 1 {
+		t.Fatalf("first snapshot = %d, want 1", got)
+	}
+	f.revision = 2
+	if got := snapshot(); got != 1 {
+		t.Errorf("snapshot within the window = %d, want 1", got)
+	}
+	time.Sleep(60 * time.Millisecond)
+	if got := snapshot(); got != 2 {
+		t.Errorf("snapshot after the window = %d, want 2", got)
 	}
 }
 
