@@ -1,7 +1,5 @@
 # relay-authz
 
-[![CI](https://github.com/dpkingii/relay-authz/actions/workflows/ci.yml/badge.svg)](https://github.com/dpkingii/relay-authz/actions/workflows/ci.yml)
-
 A relationship-based authorization service in Go, modeled on Google's [Zanzibar paper](https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/). It answers "can this user do this action on this object?" from relation tuples stored in PostgreSQL, with check results cached in Redis, and the reverse question, "what can this user access?"
 
 ## Highlights
