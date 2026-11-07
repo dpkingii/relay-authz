@@ -4,8 +4,6 @@
 
 A relationship-based authorization service in Go, modeled on Google's [Zanzibar paper](https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/). It answers "can this user do this action on this object?" from relation tuples stored in PostgreSQL, with check results cached in Redis, and the reverse question, "what can this user access?"
 
-![Granting alice access through a group and a folder, checking it, looking up what she can view, then revoking it](docs/demo.gif)
-
 ## Highlights
 
 - **4,000 checks/s with a p99 under 8 ms** over a 6-hop permission graph. At 8,000 checks/s the Redis cache holds a 12.6 ms p99 where uncached checks degrade to 95 ms.
@@ -157,4 +155,4 @@ After changing `schema.sql`, reset the database with `docker compose down -v && 
 | `schema.sql` | the `tuples` and `revision` tables |
 | `examples/clinic.yaml` | rules for a clinic's records |
 | `loadtest/` | k6 script, the script that runs every mode, the summary script, and results |
-| `docs/` | benchmark results, the README diagrams, the demo GIF and the [vhs](https://github.com/charmbracelet/vhs) script that records it |
+| `docs/` | benchmark results and the README diagrams |
