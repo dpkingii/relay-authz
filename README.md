@@ -1,6 +1,10 @@
 # relay-authz
 
+[![CI](https://github.com/dpkingii/relay-authz/actions/workflows/ci.yml/badge.svg)](https://github.com/dpkingii/relay-authz/actions/workflows/ci.yml)
+
 A relationship-based authorization service in Go, modeled on Google's [Zanzibar paper](https://research.google/pubs/zanzibar-googles-consistent-global-authorization-system/). It answers "can this user do this action on this object?" from relation tuples stored in PostgreSQL, with check results cached in Redis, and the reverse question, "what can this user access?"
+
+![Granting alice access through a group and a folder, checking it, looking up what she can view, then revoking it](docs/demo.gif)
 
 A tuple says one subject has a relation on one object:
 
@@ -9,17 +13,38 @@ document:budget#viewer@user:alice              alice can view the budget doc
 document:budget#viewer@group:finance#member    every member of finance can view it
 ```
 
-## Status
+## Highlights
 
-- [x] Tuples table, write/delete API
-- [x] Direct checks
-- [x] Recursive checks through groups and parent folders, config-defined relation rules, depth limit and cycle detection
-- [x] Revision numbers and a Redis cache keyed by revision
-- [x] Docker image, Compose stack and k6 load test
-- [x] Load test results
-- [x] Bounded-staleness snapshots, so the cache still hits under writes
-- [x] Reverse lookup: every object a user has a relation on
-- [x] A second rules file, for a clinic's records
+- **4,000 checks/s with a p99 under 8 ms** over a 6-hop permission graph. At 8,000 checks/s the Redis cache holds a 12.6 ms p99 where uncached checks degrade to 95 ms. See [Load test](#load-test).
+- **Revoked access is never served from the cache.** Every write returns a revision, and a check can demand a result at least that new: a simplified version of Zanzibar's zookies, for its "new enemy" problem. See [Revisions and caching](#revisions-and-caching).
+- **"What can alice see?" in 7 queries instead of 45,760**, by walking the graph backward from the user. See [Lookup](#lookup).
+- **Checks and lookups are tested against brute force**: both are compared with a simple closure over every grant on 300 random tuple sets, cycles included.
+- **The rules are data.** The same service runs a [clinic's records](#another-domain-a-clinic) from a second YAML file.
+
+## Quick start
+
+```sh
+docker compose --profile server up -d --build      # server on localhost:8080
+
+curl -X POST localhost:8080/v1/tuples -d '{"tuple": "group:finance#member@user:alice"}'
+curl -X POST localhost:8080/v1/tuples -d '{"tuple": "folder:finance#viewer@group:finance#member"}'
+curl -X POST localhost:8080/v1/tuples -d '{"tuple": "document:budget#parent@folder:finance"}'
+# {"revision":3}
+
+curl 'localhost:8080/v1/check?object=document:budget&relation=viewer&user=user:alice'
+# {"allowed":true,"revision":3}
+
+curl 'localhost:8080/v1/lookup?type=document&relation=viewer&user=user:alice'
+# {"objects":["document:budget"],"revision":3}
+
+curl -X DELETE localhost:8080/v1/tuples -d '{"tuple": "group:finance#member@user:alice"}'
+# {"revision":4}
+
+curl 'localhost:8080/v1/check?object=document:budget&relation=viewer&user=user:alice&at_least=4'
+# {"allowed":false,"revision":4}
+```
+
+The first check is cached; the last one can't reuse it, because it asks for revision 4 or later.
 
 ## Rules
 
@@ -36,6 +61,31 @@ document:
     via:
       - {tupleset: parent, relation: viewer}    # viewers of the parent folder can view
 ```
+
+Tuples and rules together form a graph. Here alice is in finance, finance can view a folder, the budget is in that folder, and alice owns the roadmap:
+
+```mermaid
+flowchart LR
+  alice(["user:alice"])
+  member["group:finance<br/>member"]
+  folder["folder:finance<br/>viewer"]
+  budget["document:budget<br/>viewer"]
+  owner["document:roadmap<br/>owner"]
+  editor["document:roadmap<br/>editor"]
+  viewer["document:roadmap<br/>viewer"]
+
+  alice -- tuple --> member
+  member -- tuple --> folder
+  folder -- "via parent" --> budget
+  alice -- tuple --> owner
+  owner -- implied_by --> editor
+  editor -- implied_by --> viewer
+
+  classDef doc stroke-width:3px
+  class budget,viewer doc
+```
+
+Arrows point the way access flows. A check starts at the right, say at the budget's viewers, and walks the arrows backward until it finds alice. A [lookup](#lookup) starts at alice and walks them forward, collecting every document viewer it reaches: the budget and the roadmap.
 
 A check for `document:budget#viewer@user:abe` walks the tuple graph: abe's own tuples, then groups whose members are viewers (and groups inside those groups), then editors and owners, then viewers of the parent folder and its parents. Every rule is a union, so the walk stops at the first match. It skips any `object#relation` it has already visited, which handles cycles like two groups containing each other, and it gives up after 25 hops.
 
@@ -62,6 +112,15 @@ GET /v1/lookup?type=patient&relation=viewer&user=user:nurse_ana           → ["
 Ending the referral is one `DELETE` of the `referred` tuple. A test runs these checks so the example stays true. The data is made up.
 
 ## Revisions and caching
+
+```mermaid
+flowchart LR
+  req["check"] --> rev["required revision:<br/>at_least, or a recent snapshot"]
+  rev --> cache{"cached at that<br/>revision or newer?"}
+  cache -- hit --> out["allowed + revision"]
+  cache -- miss --> walk["walk the tuple<br/>graph in Postgres"]
+  walk --> store["cache the result<br/>with its revision"] --> out
+```
 
 Every write and delete bumps a global revision in the same transaction and returns it. A check result is cached in Redis with the revision it was computed at, and a check is served from the cache only if that revision is recent enough:
 
@@ -241,4 +300,5 @@ Tests that need Postgres or Redis skip when the variable isn't set. After changi
 | `internal/api` | HTTP handlers |
 | `schema.sql` | the `tuples` and `revision` tables |
 | `examples/clinic.yaml` | rules for a clinic's records |
+| `docs/` | the demo GIF and the [vhs](https://github.com/charmbracelet/vhs) script that records it |
 | `loadtest/` | k6 script, the script that runs every mode, the summary script, and results |
